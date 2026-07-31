@@ -1,0 +1,6 @@
+{
+  "name": "JBD BMS Bluetooth Monitor",
+  "description": "Додаток для підключення до JBD Smart BMS через Bluetooth (BLE), моніторингу стану осередків, температур, струму та налаштування параметрів захисту акумулятора.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
