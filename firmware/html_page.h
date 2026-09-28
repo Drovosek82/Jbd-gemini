@@ -447,8 +447,13 @@ footer{text-align:center;font-size:10px;color:var(--mut);padding-top:12px;border
     </div>
 
     <div class="field">
-      <label>Server URL</label>
-      <input id="cServer" type="text" placeholder="https://your-server-url/api/bms/push">
+      <label>Server URL (Supabase REST)</label>
+      <input id="cServer" type="text" placeholder="https://PROJECT.supabase.co/rest/v1/bms_telemetry">
+    </div>
+
+    <div class="field">
+      <label>Supabase Anon Key (API Key)</label>
+      <input id="cApiKey" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
     </div>
 
     <hr class="hr">
@@ -765,6 +770,7 @@ function loadCloudSettings() {
       document.getElementById('cClientId').value = d.client_id || '';
       document.getElementById('cEnabled').checked = d.enabled || false;
       document.getElementById('cServer').value = d.server || '';
+      document.getElementById('cApiKey').value = d.api_key || '';
     })
     .catch(() => console.error('Failed to load cloud settings'));
 }
@@ -774,8 +780,9 @@ function cloudSave() {
   const clientId = document.getElementById('cClientId').value;
   const enabled = document.getElementById('cEnabled').checked;
   const server = document.getElementById('cServer').value;
+  const apiKey = document.getElementById('cApiKey').value;
 
-  fetch('/cloud-save?device_id=' + encodeURIComponent(deviceId) + '&client_id=' + encodeURIComponent(clientId) + '&enabled=' + enabled + '&server=' + encodeURIComponent(server))
+  fetch('/cloud-save?device_id=' + encodeURIComponent(deviceId) + '&client_id=' + encodeURIComponent(clientId) + '&enabled=' + enabled + '&server=' + encodeURIComponent(server) + '&api_key=' + encodeURIComponent(apiKey))
     .then(r => r.json())
     .then(d => {
       if (d.status === 'ok') toast('Cloud налаштування збережено', 'ok');

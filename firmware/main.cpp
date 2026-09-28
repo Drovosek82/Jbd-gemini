@@ -94,7 +94,7 @@ void loop() {
   handleDisplay();
 
   // Handle API data sending
-  // handleAPIData();  // хмарна відправка вимкнена
+  handleAPIData();
 
   // Auto-reconnect to BMS if configured and disconnected
   static unsigned long lastBMSReconnect = 0;

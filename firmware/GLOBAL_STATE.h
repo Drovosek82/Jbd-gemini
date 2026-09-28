@@ -54,6 +54,7 @@ inline bool displayActive = false;
 inline String apiServer = "";
 inline String deviceId = "bms_001";
 inline String clientId = "";
+inline String apiKey = "";
 
 // BLE Objects (inline definitions)
 inline BLEClient* pClient = nullptr;

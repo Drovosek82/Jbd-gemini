@@ -122,25 +122,29 @@ inline void loadAppConfig() {
   apiServer = preferences.getString("api_server", apiServer);
   deviceId = preferences.getString("device_id", deviceId);
   clientId = preferences.getString("client_id", clientId);
+  apiKey = preferences.getString("api_key", apiKey);
   preferences.end();
   Serial.println("[WiFi] Завантажено налаштування API");
   Serial.printf("[WiFi] API Server: %s\n", apiServer.c_str());
   Serial.printf("[WiFi] Device ID: %s\n", deviceId.c_str());
   Serial.printf("[WiFi] Client ID: %s\n", clientId.c_str());
+  Serial.printf("[WiFi] API Key: %s\n", apiKey.length() > 0 ? "***" : "(empty)");
 }
 
 // Save app configuration to preferences
-inline bool saveAppConfig(const String& server, const String& id, const String& cId) {
+inline bool saveAppConfig(const String& server, const String& id, const String& cId, const String& key) {
   preferences.begin("app-config", false);
   bool success = preferences.putString("api_server", server);
   success &= preferences.putString("device_id", id);
   success &= preferences.putString("client_id", cId);
+  success &= preferences.putString("api_key", key);
   preferences.end();
 
   if (success) {
     apiServer = server;
     deviceId = id;
     clientId = cId;
+    apiKey = key;
     Serial.println("[WiFi] Налаштування API збережено");
     Serial.printf("[WiFi] API Server: %s\n", apiServer.c_str());
     Serial.printf("[WiFi] Device ID: %s\n", deviceId.c_str());
@@ -152,8 +156,12 @@ inline bool saveAppConfig(const String& server, const String& id, const String& 
   }
 }
 
+inline bool saveAppConfig(const String& server, const String& id, const String& cId) {
+  return saveAppConfig(server, id, cId, apiKey);
+}
+
 inline bool saveAppConfig(const String& server, const String& id) {
-  return saveAppConfig(server, id, clientId);
+  return saveAppConfig(server, id, clientId, apiKey);
 }
 
 // Reset WiFi configuration

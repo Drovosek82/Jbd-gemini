@@ -466,30 +466,38 @@ inline void handleAutoPoll() {
 // ─── handleCloudSettings — GET /cloud-settings ───────────
 inline void handleCloudSettings() {
   server.sendHeader("Access-Control-Allow-Origin", "*");
-  StaticJsonDocument<256> doc;
+  StaticJsonDocument<512> doc;
   doc["device_id"] = deviceId;
   doc["client_id"] = clientId;
-  doc["enabled"] = false;
+  doc["enabled"] = apiServer.length() > 0 && clientId.length() > 0;
   doc["server"] = apiServer;
+  doc["api_key"] = apiKey;
   String response;
   serializeJson(doc, response);
   server.send(200, "application/json", response);
 }
 
-// ─── handleCloudSave — GET /cloud-save?device_id=...&client_id=...&enabled=...&server=...
+// ─── handleCloudSave — GET /cloud-save?device_id=...&client_id=...&enabled=...&server=...&api_key=...
 inline void handleCloudSave() {
   server.sendHeader("Access-Control-Allow-Origin", "*");
   String devId = server.arg("device_id");
   String cId = server.arg("client_id");
   bool enabled = server.arg("enabled") == "true";
   String serverUrl = server.arg("server");
+  String key = server.arg("api_key");
+  if (key.length() == 0) {
+    key = server.arg("apikey");
+  }
   Serial.printf("[Web] GET /cloud-save device_id=%s client_id=%s enabled=%d server=%s\n", devId.c_str(), cId.c_str(), enabled ? 1 : 0, serverUrl.c_str());
   deviceId = devId;
   clientId = cId;
   if (serverUrl.length() > 0) {
     apiServer = serverUrl;
   }
-  saveAppConfig(apiServer, deviceId, clientId);
+  if (key.length() > 0) {
+    apiKey = key;
+  }
+  saveAppConfig(apiServer, deviceId, clientId, apiKey);
   server.send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
