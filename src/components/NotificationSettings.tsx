@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { bleManager } from '../lib/bleManager';
+import { SupabaseSyncSettings } from './SupabaseSyncSettings';
 import { NotificationThresholds, AlertNotificationItem, AlertSeverity } from '../types/bms';
 import { playWarningBeep, playDangerAlarm } from '../lib/soundAlerts';
 import {
@@ -134,89 +135,10 @@ export const NotificationSettings: React.FC = () => {
         </div>
       </div>
 
+      {/* Supabase Database Cloud Sync Settings */}
+      <SupabaseSyncSettings />
+
       <form onSubmit={handleSave} className="space-y-6">
-        {/* Global Sound & Push Notifications Toggle */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl">
-          <h3 className="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2">
-            <Volume2 className="w-4 h-4 text-cyan-400" />
-            <span>Канали сповіщень (Звук та Браузер)</span>
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Audio Toggle */}
-            <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className={`p-2.5 rounded-xl ${formState.soundEnabled ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-500'}`}>
-                  {formState.soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
-                </div>
-                <div>
-                  <div className="text-sm font-semibold text-slate-200">Звукові тривоги</div>
-                  <div className="text-xs text-slate-400">Звуковий сигнал при виникненні тривоги</div>
-                </div>
-              </div>
-
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formState.soundEnabled}
-                  onChange={(e) => handleChange('soundEnabled', e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
-              </label>
-            </div>
-
-            {/* Desktop Push Notifications */}
-            <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className={`p-2.5 rounded-xl ${formState.browserNotificationsEnabled ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-slate-500'}`}>
-                  <Bell className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold text-slate-200">Сповіщення ОС</div>
-                  <div className="text-xs text-slate-400">Push-сповіщення у фоні</div>
-                </div>
-              </div>
-
-              {formState.browserNotificationsEnabled ? (
-                <span className="text-xs text-emerald-400 font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center">
-                  <Check className="w-3.5 h-3.5 mr-1" /> Увімкнено
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleEnableDesktopNotifs}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition-colors"
-                >
-                  Дозволити
-                </button>
-              )}
-            </div>
-
-            {/* Auto Reconnect Toggle */}
-            <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className={`p-2.5 rounded-xl ${bleManager.autoReconnectEnabled ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
-                  <RotateCcw className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold text-slate-200">Авто-перепідключення</div>
-                  <div className="text-xs text-slate-400">Відновлення зв'язку при розриві</div>
-                </div>
-              </div>
-
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={bleManager.autoReconnectEnabled}
-                  onChange={(e) => bleManager.setAutoReconnectEnabled(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
-              </label>
-            </div>
-          </div>
-        </div>
 
         {/* Custom Threshold Parameters Form */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

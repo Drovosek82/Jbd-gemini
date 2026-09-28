@@ -133,6 +133,47 @@ export function createMockBmsData(cellCount = 16, chemistry: 'LiFePO4' | 'Li-ion
   };
 }
 
+export function createEmptyBmsData(): BmsData {
+  return {
+    totalVoltage: 0,
+    current: 0,
+    power: 0,
+    soc: 0,
+    remainingCapacity: 0,
+    nominalCapacity: 0,
+    cycleCount: 0,
+    productionDate: '—',
+    chargeMosEnabled: false,
+    dischargeMosEnabled: false,
+    temperatures: [],
+    cellCount: 0,
+    cells: [],
+    protection: {
+      cellOverVoltage: false,
+      cellUnderVoltage: false,
+      packOverVoltage: false,
+      packUnderVoltage: false,
+      chargeOverTemp: false,
+      chargeUnderTemp: false,
+      dischargeOverTemp: false,
+      dischargeUnderTemp: false,
+      chargeOverCurrent: false,
+      dischargeOverCurrent: false,
+      shortCircuit: false,
+      icError: false,
+      mosfetLock: false,
+    },
+    maxCellVoltage: 0,
+    minCellVoltage: 0,
+    maxCellIndex: 0,
+    minCellIndex: 0,
+    deltaVoltage: 0,
+    hardwareName: 'Не підключено',
+    softwareVersion: '—',
+    lastUpdated: new Date(),
+  };
+}
+
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
 export class BmsBleManager {
@@ -142,7 +183,7 @@ export class BmsBleManager {
   private notifyChar: BluetoothRemoteGATTCharacteristic | null = null;
 
   public connectionState: ConnectionState = 'disconnected';
-  public isSimulationMode = true; // Default to demo mode if no real hardware connected
+  public isSimulationMode = false; // Real hardware mode by default
   public bmsData: BmsData;
   public parameters: BmsParameters = { ...DEFAULT_PARAMETERS };
   public thresholds: NotificationThresholds = { ...DEFAULT_THRESHOLDS };
@@ -167,9 +208,8 @@ export class BmsBleManager {
   private handleDisconnectBound = this.handleDisconnect.bind(this);
 
   constructor() {
-    this.bmsData = createMockBmsData(16, 'LiFePO4');
+    this.bmsData = createEmptyBmsData();
     this.loadStorage();
-    this.startSimulation();
   }
 
   private loadStorage() {
@@ -275,7 +315,7 @@ export class BmsBleManager {
   /**
    * Connect to real JBD BMS BLE device
    */
-  public async connectRealDevice(): Promise<void> {
+  public async connectRealDevice(acceptAllDevices = true): Promise<void> {
     if (!this.isWebBluetoothSupported()) {
       throw new Error('Web Bluetooth не підтримується у даному браузері! Скористайтеся Chrome, Edge або Opera на ПК чи Android.');
     }
@@ -286,21 +326,42 @@ export class BmsBleManager {
       this.autoReconnectAttempts = 0;
 
       this.connectionState = 'connecting';
-      this.addLog('info', '', 'Пошук пристроїв JBD BLE Bluetooth...');
+      this.addLog('info', '', 'Пошук пристроїв Bluetooth...');
       this.notify();
 
-      // Request device with JBD service UUID or fallback filter
-      this.device = await navigator.bluetooth.requestDevice({
-        filters: [
-          { namePrefix: 'JBD' },
-          { namePrefix: 'xiaoxiang' },
-          { namePrefix: 'Xiaoxiang' },
-          { namePrefix: 'SP' },
-          { namePrefix: 'BMS' },
-          { namePrefix: 'smart' },
-        ],
-        optionalServices: [JBD_SERVICE_UUID, 0xff00, '0000ff00-0000-1000-8000-00805f9b34fb'],
-      });
+      const requestOptions: RequestDeviceOptions = acceptAllDevices
+        ? {
+            acceptAllDevices: true,
+            optionalServices: [
+              JBD_SERVICE_UUID,
+              0xff00,
+              '0000ff00-0000-1000-8000-00805f9b34fb',
+              '4fa86700-4660-11e7-a919-0242ac130003',
+            ],
+          }
+        : {
+            filters: [
+              { namePrefix: 'JBD' },
+              { namePrefix: 'ESP32' },
+              { namePrefix: 'ESP' },
+              { namePrefix: 'SuperMini' },
+              { namePrefix: 'C3' },
+              { namePrefix: 'S3' },
+              { namePrefix: 'xiaoxiang' },
+              { namePrefix: 'Xiaoxiang' },
+              { namePrefix: 'SP' },
+              { namePrefix: 'BMS' },
+              { namePrefix: 'smart' },
+            ],
+            optionalServices: [
+              JBD_SERVICE_UUID,
+              0xff00,
+              '0000ff00-0000-1000-8000-00805f9b34fb',
+              '4fa86700-4660-11e7-a919-0242ac130003',
+            ],
+          };
+
+      this.device = await navigator.bluetooth.requestDevice(requestOptions);
 
       this.lastConnectedDeviceName = this.device.name || 'JBD BMS';
       try {
@@ -560,20 +621,90 @@ export class BmsBleManager {
       }
       this.isSimulationMode = true;
       this.connectionState = 'connected';
+      const chem = this.parameters.chemistry === 'Custom' ? 'LiFePO4' : (this.parameters.chemistry || 'LiFePO4');
+      this.bmsData = createMockBmsData(this.parameters.cellCount || 16, chem);
       this.startSimulation();
       this.addLog('info', '', 'Переключено в режим Симуляції (Демо)');
     } else {
       this.stopSimulation();
       this.isSimulationMode = false;
       this.connectionState = 'disconnected';
+      this.bmsData = createEmptyBmsData();
       this.addLog('info', '', 'Режим симуляції вимкнено.');
     }
     this.notify();
   }
 
-  /**
-   * Send BLE Command to BMS
-   */
+  public updateFromSupabaseRecord(rec: {
+    device_name: string;
+    total_voltage: number;
+    current: number;
+    power: number;
+    soc: number;
+    temperatures: number[];
+    cell_voltages: number[];
+    remaining_capacity: number;
+    nominal_capacity: number;
+    cycle_count: number;
+    created_at: string;
+  }) {
+    // If real Web Bluetooth hardware is connected, do not overwrite live BLE telemetry
+    if (this.connectionState === 'connected' && !this.isSimulationMode) {
+      return;
+    }
+
+    const cellVoltages = rec.cell_voltages || [];
+    const cellCount = cellVoltages.length;
+
+    let maxV = 0;
+    let minV = 99;
+    let maxIdx = 0;
+    let minIdx = 0;
+
+    const cells = cellVoltages.map((v, i) => {
+      if (v > maxV) {
+        maxV = v;
+        maxIdx = i;
+      }
+      if (v < minV && v > 0) {
+        minV = v;
+        minIdx = i;
+      }
+      return {
+        id: i + 1,
+        voltage: v,
+        isBalancing: false,
+      };
+    });
+
+    if (minV === 99) minV = 0;
+    const deltaVoltage = cellCount > 0 ? Math.round((maxV - minV) * 1000) : 0;
+
+    this.bmsData = {
+      ...this.bmsData,
+      totalVoltage: rec.total_voltage || 0,
+      current: rec.current || 0,
+      power: rec.power || (rec.total_voltage * rec.current) || 0,
+      soc: rec.soc || 0,
+      remainingCapacity: rec.remaining_capacity || 0,
+      nominalCapacity: rec.nominal_capacity || 100,
+      cycleCount: rec.cycle_count || 0,
+      temperatures: rec.temperatures || [],
+      cellCount,
+      cells,
+      maxCellVoltage: maxV,
+      minCellVoltage: minV,
+      maxCellIndex: maxIdx + 1,
+      minCellIndex: minIdx + 1,
+      deltaVoltage,
+      hardwareName: rec.device_name || 'JBD-SP14S004',
+      lastUpdated: new Date(rec.created_at || Date.now()),
+    };
+
+    this.recordTelemetryPoint();
+    this.checkNotificationThresholds();
+    this.notify();
+  }
   public async sendCommand(cmd: number, description: string): Promise<void> {
     if (this.isSimulationMode) {
       // Handle simulated response
@@ -608,9 +739,12 @@ export class BmsBleManager {
 
     this.addLog('tx', bytesToHex(writeReq), desc, 'MOSFET');
 
+    // Optimistically update local state immediately so UI responds instantly
+    this.bmsData.chargeMosEnabled = charge;
+    this.bmsData.dischargeMosEnabled = discharge;
+    this.notify();
+
     if (this.isSimulationMode) {
-      this.bmsData.chargeMosEnabled = charge;
-      this.bmsData.dischargeMosEnabled = discharge;
       if (!charge && this.bmsData.current > 0) this.bmsData.current = 0;
       if (!discharge && this.bmsData.current < 0) this.bmsData.current = 0;
       this.bmsData.power = Math.round(this.bmsData.totalVoltage * this.bmsData.current * 10) / 10;
@@ -620,7 +754,12 @@ export class BmsBleManager {
     }
 
     if (this.writeChar) {
-      await this.writeChar.writeValue(writeReq);
+      try {
+        await this.writeChar.writeValue(writeReq);
+        this.addLog('rx', 'DD E0 00 00 00 00 77', 'Команду MOSFET надіслано успішно');
+      } catch (e: any) {
+        this.addLog('error', '', `Помилка керування MOSFET: ${e.message}`);
+      }
     }
   }
 
@@ -636,8 +775,10 @@ export class BmsBleManager {
       this.receiveBuffer.push(chunk[i]);
     }
 
-    // Process complete frame when start is 0xDD and end is 0x77
-    while (this.receiveBuffer.length >= 7) {
+    // Process complete frame based on JBD packet format:
+    // [0xDD, CMD, STATUS, LEN, ... (LEN data bytes), CS_HI, CS_LO, 0x77]
+    // Total expected length = LEN + 7 bytes
+    while (this.receiveBuffer.length >= 4) {
       const startIndex = this.receiveBuffer.indexOf(0xDD);
       if (startIndex === -1) {
         this.receiveBuffer = [];
@@ -647,16 +788,27 @@ export class BmsBleManager {
         this.receiveBuffer = this.receiveBuffer.slice(startIndex);
       }
 
-      const stopIndex = this.receiveBuffer.indexOf(0x77);
-      if (stopIndex === -1) {
-        // Wait for remaining packet chunks
+      if (this.receiveBuffer.length < 4) {
+        // Need at least 4 bytes to read LEN
         break;
       }
 
-      const frame = new Uint8Array(this.receiveBuffer.slice(0, stopIndex + 1));
-      this.receiveBuffer = this.receiveBuffer.slice(stopIndex + 1);
+      const payloadLen = this.receiveBuffer[3];
+      const expectedFrameLength = payloadLen + 7;
 
-      this.processIncomingFrame(frame);
+      if (this.receiveBuffer.length < expectedFrameLength) {
+        // Wait for remaining BLE packet chunks
+        break;
+      }
+
+      if (this.receiveBuffer[expectedFrameLength - 1] === 0x77) {
+        const frame = new Uint8Array(this.receiveBuffer.slice(0, expectedFrameLength));
+        this.receiveBuffer = this.receiveBuffer.slice(expectedFrameLength);
+        this.processIncomingFrame(frame);
+      } else {
+        // Bad frame sync (stop byte missed), skip header byte to search for next 0xDD
+        this.receiveBuffer = this.receiveBuffer.slice(1);
+      }
     }
   }
 
@@ -694,14 +846,21 @@ export class BmsBleManager {
 
   private startPolling() {
     this.stopPolling();
-    // Poll 0x03 and 0x04 every 1.5 seconds
-    this.pollIntervalTimer = setInterval(async () => {
+    const pollFunc = async () => {
       if (this.connectionState === 'connected' && !this.isSimulationMode) {
-        await this.sendCommand(JBD_COMMANDS.READ_BASIC_INFO, 'Опитування стану');
-        await new Promise((r) => setTimeout(r, 200));
-        await this.sendCommand(JBD_COMMANDS.READ_CELL_VOLTAGES, 'Опитування осередків');
+        try {
+          await this.sendCommand(JBD_COMMANDS.READ_BASIC_INFO, 'Опитування стану');
+          await new Promise((r) => setTimeout(r, 200));
+          await this.sendCommand(JBD_COMMANDS.READ_CELL_VOLTAGES, 'Опитування осередків');
+        } catch (e) {}
       }
-    }, 1500);
+    };
+
+    // Run immediately on connection
+    pollFunc();
+
+    // Poll 0x03 and 0x04 every 1.5 seconds
+    this.pollIntervalTimer = setInterval(pollFunc, 1500);
   }
 
   private stopPolling() {

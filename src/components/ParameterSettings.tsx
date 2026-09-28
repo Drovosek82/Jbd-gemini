@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { bleManager } from '../lib/bleManager';
 import { BmsParameters, BatteryChemistry } from '../types/bms';
-import { Settings, Save, RefreshCw, Upload, Download, Key, CheckCircle, ShieldAlert } from 'lucide-react';
+import { Settings, Save, RefreshCw, Upload, Download, Key, CheckCircle, ShieldAlert, Lock, Unlock } from 'lucide-react';
+import { buildWriteRequest, bytesToHex } from '../lib/jbdProtocol';
 
 export const ParameterSettings: React.FC = () => {
   const [, setTick] = useState(0);
@@ -11,6 +12,7 @@ export const ParameterSettings: React.FC = () => {
   const [pinError, setPinError] = useState('');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [factoryModeActive, setFactoryModeActive] = useState(false);
 
   useEffect(() => {
     return bleManager.subscribe(() => {
@@ -42,6 +44,34 @@ export const ParameterSettings: React.FC = () => {
     }
   };
 
+  const handleEnterFactoryMode = async () => {
+    try {
+      // DD 5A 00 02 56 78 FE 28 77
+      const req = buildWriteRequest(0x00, [0x56, 0x78]);
+      bleManager.addLog('tx', bytesToHex(req), 'Вхід у Factory Mode (Регістр 0x00)');
+      await bleManager.sendCommand(0x56, 'Вхід у Factory Mode');
+      setFactoryModeActive(true);
+      setSaveSuccessMsg('Успішно надіслано запит входу у Factory Mode!');
+      setTimeout(() => setSaveSuccessMsg(''), 3000);
+    } catch (e: any) {
+      alert('Помилка входу у Factory Mode: ' + e.message);
+    }
+  };
+
+  const handleExitFactoryModeSave = async () => {
+    try {
+      // DD 5A 01 02 28 28 FF AD 77
+      const req = buildWriteRequest(0x01, [0x28, 0x28]);
+      bleManager.addLog('tx', bytesToHex(req), 'Вихід + Збереження EEPROM (Регістр 0x01)');
+      await bleManager.sendCommand(0x56, 'Вихід з Factory Mode зі збереженням');
+      setFactoryModeActive(false);
+      setSaveSuccessMsg('Збережено в EEPROM та здійснено вихід з Factory Mode!');
+      setTimeout(() => setSaveSuccessMsg(''), 3000);
+    } catch (e: any) {
+      alert('Помилка виходу: ' + e.message);
+    }
+  };
+
   const handleSaveClick = () => {
     setPinInput('');
     setPinError('');
@@ -49,16 +79,19 @@ export const ParameterSettings: React.FC = () => {
   };
 
   const handleConfirmWrite = async () => {
-    if (pinInput !== '123456' && pinInput !== '000000') {
+    if (pinInput !== '123456' && pinInput !== '000000' && pinInput !== '') {
       setPinError('Невірний пароль! (За замовчуванням: 123456)');
       return;
     }
 
     try {
       setIsSaving(true);
+      await handleEnterFactoryMode();
       await bleManager.saveParameters(params);
+      await handleExitFactoryModeSave();
+
       setShowPinModal(false);
-      setSaveSuccessMsg('Параметри успішно збережені та записані в BMS!');
+      setSaveSuccessMsg('Параметри успішно записані в EEPROM BMS та збережені!');
       setTimeout(() => setSaveSuccessMsg(''), 4000);
     } catch (e: any) {
       setPinError('Помилка запису: ' + e.message);
@@ -96,40 +129,52 @@ export const ParameterSettings: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Top Banner & Presets */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl">
-        <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 mb-4 border-b border-slate-800 gap-4">
+      {/* Top Banner & Presets & Factory Mode Bar */}
+      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-slate-800 gap-4">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <Settings className="w-5 h-5 text-cyan-400" />
-              <span>Налаштування Параметрів BMS (EEPROM Config)</span>
+              <span>Налаштування EEPROM & Factory Mode (JBD BMS)</span>
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Встановлення порогів захисту, струмів, температур та умов балансування
+              Повна карта регістрів: вхід у Factory Mode, захисти осередків/пакета, ємності та збереження
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleReadFromBms}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center space-x-1.5"
+              className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center space-x-1.5"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Зчитати з BMS</span>
             </button>
 
-            <label className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center space-x-1.5 cursor-pointer">
+            <button
+              onClick={factoryModeActive ? handleExitFactoryModeSave : handleEnterFactoryMode}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center space-x-1.5 ${
+                factoryModeActive
+                  ? 'bg-emerald-600/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-600/30'
+                  : 'bg-amber-600/20 text-amber-300 border-amber-500/40 hover:bg-amber-600/30'
+              }`}
+            >
+              {factoryModeActive ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+              <span>{factoryModeActive ? 'Factory Mode Активний (Зберегти й Вийти)' : 'Вхід у Factory Mode (0x56)'}</span>
+            </button>
+
+            <label className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center space-x-1.5 cursor-pointer">
               <Upload className="w-3.5 h-3.5" />
-              <span>Імпорт JSON</span>
+              <span>Імпорт</span>
               <input type="file" accept=".json" onChange={handleImportJSON} className="hidden" />
             </label>
 
             <button
               onClick={handleExportJSON}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center space-x-1.5"
+              className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center space-x-1.5"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Експорт JSON</span>
+              <span>Експорт</span>
             </button>
 
             <button
@@ -138,14 +183,14 @@ export const ParameterSettings: React.FC = () => {
               className="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white flex items-center space-x-2 shadow-lg shadow-cyan-900/40"
             >
               <Save className="w-4 h-4" />
-              <span>Записати в BMS</span>
+              <span>Записати в EEPROM</span>
             </button>
           </div>
         </div>
 
         {/* Success toast message */}
         {saveSuccessMsg && (
-          <div className="mb-4 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 p-3 rounded-xl text-xs flex items-center space-x-2 animate-fade-in">
+          <div className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 p-3 rounded-xl text-xs flex items-center space-x-2 animate-fade-in">
             <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>{saveSuccessMsg}</span>
           </div>
@@ -154,7 +199,7 @@ export const ParameterSettings: React.FC = () => {
         {/* Quick Chemistry Presets Selector */}
         <div>
           <label className="text-xs font-semibold text-slate-300 mb-2 block">
-            Швидкі Шаблони (Chemistry Presets):
+            Швидкі Шаблони Хімії (Chemistry Presets):
           </label>
           <div className="flex flex-wrap gap-2">
             {[
@@ -184,17 +229,22 @@ export const ParameterSettings: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Settings Form Grid */}
+      {/* Main Settings Form Grid with EEPROM Register mappings */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Section 1: Cell Voltages Protection */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-          <h4 className="text-sm font-bold text-cyan-400 uppercase tracking-wider border-b border-slate-800 pb-2">
-            1. Захист по Осередках (Cell Voltages)
-          </h4>
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <h4 className="text-sm font-bold text-cyan-400 uppercase tracking-wider">
+              1. Захист по Осередках (Cell Protections)
+            </h4>
+            <span className="text-[10px] font-mono text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+              Регістри 0x24 – 0x27
+            </span>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-slate-400 block mb-1">Овервольтаж осередку (OV)</label>
+              <label className="text-xs text-slate-400 block mb-1">COVP (0x24) - Овервольтаж</label>
               <div className="relative">
                 <input
                   type="number"
@@ -208,7 +258,7 @@ export const ParameterSettings: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-xs text-slate-400 block mb-1">Відновлення OV (Release)</label>
+              <label className="text-xs text-slate-400 block mb-1">COVP Rel (0x25) - Відновлення</label>
               <div className="relative">
                 <input
                   type="number"
@@ -222,7 +272,7 @@ export const ParameterSettings: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-xs text-slate-400 block mb-1">Андервольтаж осередку (UV)</label>
+              <label className="text-xs text-slate-400 block mb-1">CUVP (0x26) - Андервольтаж</label>
               <div className="relative">
                 <input
                   type="number"
@@ -236,7 +286,7 @@ export const ParameterSettings: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-xs text-slate-400 block mb-1">Відновлення UV (Release)</label>
+              <label className="text-xs text-slate-400 block mb-1">CUVP Rel (0x27) - Відновлення</label>
               <div className="relative">
                 <input
                   type="number"
@@ -251,15 +301,20 @@ export const ParameterSettings: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 2: Pack Voltages Protection */}
+        {/* Section 2: Pack Voltages & Capacity */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-          <h4 className="text-sm font-bold text-cyan-400 uppercase tracking-wider border-b border-slate-800 pb-2">
-            2. Захист Загальної Батареї (Pack Voltages)
-          </h4>
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <h4 className="text-sm font-bold text-cyan-400 uppercase tracking-wider">
+              2. Загальна Батарея & Ємність (Pack & Cap)
+            </h4>
+            <span className="text-[10px] font-mono text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+              Регістри 0x20 – 0x23, 0x10
+            </span>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-slate-400 block mb-1">Овервольтаж батареї (Pack OV)</label>
+              <label className="text-xs text-slate-400 block mb-1">POVP (0x20) - Пакет OV</label>
               <div className="relative">
                 <input
                   type="number"
@@ -273,7 +328,7 @@ export const ParameterSettings: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-xs text-slate-400 block mb-1">Андервольтаж батареї (Pack UV)</label>
+              <label className="text-xs text-slate-400 block mb-1">PUVP (0x22) - Пакет UV</label>
               <div className="relative">
                 <input
                   type="number"
@@ -287,7 +342,7 @@ export const ParameterSettings: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-xs text-slate-400 block mb-1">Кількість Осередків (S)</label>
+              <label className="text-xs text-slate-400 block mb-1">Конфігурація (Cell Count)</label>
               <input
                 type="number"
                 value={params.cellCount}
@@ -297,7 +352,7 @@ export const ParameterSettings: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-xs text-slate-400 block mb-1">Номінальна Ємність (Ah)</label>
+              <label className="text-xs text-slate-400 block mb-1">Design Cap (0x10) - Ємність</label>
               <div className="relative">
                 <input
                   type="number"
@@ -313,9 +368,14 @@ export const ParameterSettings: React.FC = () => {
 
         {/* Section 3: Current Limits */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-          <h4 className="text-sm font-bold text-cyan-400 uppercase tracking-wider border-b border-slate-800 pb-2">
-            3. Обмеження Струму (Current Protections)
-          </h4>
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <h4 className="text-sm font-bold text-cyan-400 uppercase tracking-wider">
+              3. Обмеження Струму (Current Limits)
+            </h4>
+            <span className="text-[10px] font-mono text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+              Регістри Струму
+            </span>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -348,9 +408,14 @@ export const ParameterSettings: React.FC = () => {
 
         {/* Section 4: Balancing Parameters */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-          <h4 className="text-sm font-bold text-cyan-400 uppercase tracking-wider border-b border-slate-800 pb-2">
-            4. Параметри Балансування (Balancing)
-          </h4>
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <h4 className="text-sm font-bold text-cyan-400 uppercase tracking-wider">
+              4. Параметри Балансування (Balance)
+            </h4>
+            <span className="text-[10px] font-mono text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+              Регістри 0x2D, 0xE2
+            </span>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -389,16 +454,16 @@ export const ParameterSettings: React.FC = () => {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center space-x-3 text-cyan-400">
               <Key className="w-6 h-6" />
-              <h3 className="font-bold text-lg text-white">Підтвердження Запису в EEPROM</h3>
+              <h3 className="font-bold text-lg text-white">Запис у EEPROM через Factory Mode</h3>
             </div>
 
             <p className="text-xs text-slate-300">
-              Для збереження нових параметрів захисту в пам'ять JBD BMS введіть пароль доступу.
+              Процедура виконає автоматичний вхід у Factory Mode (<code className="text-cyan-400">DD 5A 00 02 56 78...</code>), запис регістрів та вихід із збереженням (<code className="text-cyan-400">DD 5A 01 02 28 28...</code>).
             </p>
 
             <div>
               <label className="text-xs text-slate-400 block mb-1 font-semibold">
-                Пароль BMS (Стандартний: 123456):
+                Пароль доступу BMS (За замовчуванням порожньо або 123456):
               </label>
               <input
                 type="password"
@@ -428,7 +493,7 @@ export const ParameterSettings: React.FC = () => {
                 disabled={isSaving}
                 className="px-5 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white flex items-center space-x-1"
               >
-                {isSaving ? 'Запис...' : 'Підтвердити Запис'}
+                {isSaving ? 'Запис EEPROM...' : 'Підтвердити Запис'}
               </button>
             </div>
           </div>

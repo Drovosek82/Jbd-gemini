@@ -113,29 +113,59 @@ export function parseBasicInfoResponse(data: Uint8Array, currentBmsData?: Partia
   const protectionWord = view.getUint16(16, false);
   const protection = parseProtectionStatus(protectionWord);
 
-  const softwareVersionByte = payload[18];
-  const softwareVersion = `v${(softwareVersionByte >> 4)}.${softwareVersionByte & 0x0F}`;
+  let softwareVersion = 'v2.5';
+  let soc = 0;
+  let chargeMosEnabled = true;
+  let dischargeMosEnabled = true;
+  let cellCountFromBasicInfo = 16;
+  let ntcCount = 2;
+  let tempOffset = 23;
 
-  const soc = payload[19];
+  if (payload.length >= 35) {
+    // 36-byte layout (e.g. Sania 7 BMS based on precise byte mapping)
+    const softwareVersionByte = payload[18];
+    softwareVersion = `v${(softwareVersionByte >> 4)}.${softwareVersionByte & 0x0F}`;
+    const fetStatus = payload[20];
+    chargeMosEnabled = (fetStatus & 0x01) !== 0;
+    dischargeMosEnabled = (fetStatus & 0x02) !== 0;
+    cellCountFromBasicInfo = payload[21] || 14;
+    ntcCount = payload[22] || 2;
+    soc = payload[23];
+    tempOffset = 23;
+  } else {
+    // Standard 27-byte layout
+    const softwareVersionByte = payload[18];
+    softwareVersion = `v${(softwareVersionByte >> 4)}.${softwareVersionByte & 0x0F}`;
+    soc = payload[19];
+    const fetStatus = payload[20];
+    chargeMosEnabled = (fetStatus & 0x01) !== 0;
+    dischargeMosEnabled = (fetStatus & 0x02) !== 0;
+    cellCountFromBasicInfo = payload[21] || 16;
+    ntcCount = payload[22] || 2;
+    tempOffset = 23;
+  }
 
-  const fetStatus = payload[20];
-  const chargeMosEnabled = (fetStatus & 0x01) !== 0;
-  const dischargeMosEnabled = (fetStatus & 0x02) !== 0;
-
-  const ntcCount = payload[21];
   const temperatures: number[] = [];
-  let offset = 22;
+  let offset = tempOffset;
   for (let i = 0; i < ntcCount && offset + 1 < payload.length; i++) {
     const rawTempK = view.getUint16(offset, false);
-    const tempC = Math.round((rawTempK - 2731) / 10 * 10) / 10;
+    const tempC = Math.round(((rawTempK - 2731) / 10) * 10) / 10;
     temperatures.push(tempC);
     offset += 2;
   }
 
   const power = Math.round(totalVoltage * current * 10) / 10;
 
-  // Update cell balancing states if cells array exists
+  // Update or initialize cell voltages and balancing states if cells array is empty
   let cells = currentBmsData?.cells ? [...currentBmsData.cells] : [];
+  if (cells.length === 0 && cellCountFromBasicInfo > 0) {
+    const defaultPerCell = totalVoltage > 0 ? totalVoltage / cellCountFromBasicInfo : 3.2;
+    cells = Array.from({ length: cellCountFromBasicInfo }, (_, i) => ({
+      id: i + 1,
+      voltage: Math.round(defaultPerCell * 1000) / 1000,
+      isBalancing: false,
+    }));
+  }
   if (cells.length > 0) {
     cells = cells.map((cell, idx) => ({
       ...cell,
@@ -158,6 +188,7 @@ export function parseBasicInfoResponse(data: Uint8Array, currentBmsData?: Partia
     dischargeMosEnabled,
     temperatures,
     cells,
+    ...(cellCountFromBasicInfo > 0 && !currentBmsData?.cellCount ? { cellCount: cellCountFromBasicInfo } : {}),
     lastUpdated: new Date(),
   };
 }
