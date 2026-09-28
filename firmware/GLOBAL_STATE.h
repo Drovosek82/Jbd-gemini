@@ -51,8 +51,9 @@ inline bool displayDetected = false;
 inline bool displayActive = false;
 
 // API Configuration (inline definitions)
-inline String apiServer = "https://461983bf-ecc9-4747-8db2-e82b27bd579d-00-1m6pgpxvvfymx-cyebw660.worf.replit.dev/api/bms/push";
+inline String apiServer = "";
 inline String deviceId = "bms_001";
+inline String clientId = "";
 
 // BLE Objects (inline definitions)
 inline BLEClient* pClient = nullptr;

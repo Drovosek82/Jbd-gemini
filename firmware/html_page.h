@@ -161,7 +161,7 @@ footer{text-align:center;font-size:10px;color:var(--mut);padding-top:12px;border
 <nav>
   <div class="tab on" onclick="gNav('dash',this)">📊 Монітор</div>
   <div class="tab"    onclick="gNav('net',this)">📡 Мережа</div>
-  <div class="tab"    onclick="gNav('cloud',this)">☁ Replit</div>
+  <div class="tab"    onclick="gNav('cloud',this)">☁ Хмара</div>
 </nav>
 
 <!-- ═══════════════════════════════════════════ -->
@@ -405,11 +405,11 @@ footer{text-align:center;font-size:10px;color:var(--mut);padding-top:12px;border
 </div>
 
 <!-- ═══════════════════════════════════════════ -->
-<!--  PAGE 3 — REPLIT CLOUD                      -->
+<!--  PAGE 3 — CLOUD SERVER                      -->
 <!-- ═══════════════════════════════════════════ -->
 <div class="pg" id="pg-cloud">
   <div class="sg">
-    <h3>☁ Статус з'єднання з Replit</h3>
+    <h3>☁ Статус з'єднання з хмарою</h3>
     <div class="strow">
       <span class="chip" id="rChip">
         <span class="dot" id="rDot" style="width:6px;height:6px"></span>&nbsp;
@@ -431,6 +431,11 @@ footer{text-align:center;font-size:10px;color:var(--mut);padding-top:12px;border
     </div>
 
     <div class="field">
+      <label>Client ID (Власник)</label>
+      <input id="cClientId" type="text" placeholder="ID користувача або email">
+    </div>
+
+    <div class="field">
       <label>Статус</label>
       <div class="strow">
         <label class="sw">
@@ -443,7 +448,7 @@ footer{text-align:center;font-size:10px;color:var(--mut);padding-top:12px;border
 
     <div class="field">
       <label>Server URL</label>
-      <input id="cServer" type="text" placeholder="https://your-replit-url.replit.dev/api/bms/push">
+      <input id="cServer" type="text" placeholder="https://your-server-url/api/bms/push">
     </div>
 
     <hr class="hr">
@@ -757,6 +762,7 @@ function loadCloudSettings() {
     .then(r => r.json())
     .then(d => {
       document.getElementById('cDeviceId').value = d.device_id || '';
+      document.getElementById('cClientId').value = d.client_id || '';
       document.getElementById('cEnabled').checked = d.enabled || false;
       document.getElementById('cServer').value = d.server || '';
     })
@@ -765,10 +771,11 @@ function loadCloudSettings() {
 
 function cloudSave() {
   const deviceId = document.getElementById('cDeviceId').value;
+  const clientId = document.getElementById('cClientId').value;
   const enabled = document.getElementById('cEnabled').checked;
   const server = document.getElementById('cServer').value;
 
-  fetch('/cloud-save?device_id=' + encodeURIComponent(deviceId) + '&enabled=' + enabled + '&server=' + encodeURIComponent(server))
+  fetch('/cloud-save?device_id=' + encodeURIComponent(deviceId) + '&client_id=' + encodeURIComponent(clientId) + '&enabled=' + enabled + '&server=' + encodeURIComponent(server))
     .then(r => r.json())
     .then(d => {
       if (d.status === 'ok') toast('Cloud налаштування збережено', 'ok');

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Cpu, FolderCode, Terminal, Download, CheckCircle2, Code } from 'lucide-react';
+import { Cpu, FolderCode, Terminal, Download, CheckCircle2, Code, KeyRound } from 'lucide-react';
 import { FIRMWARE_FILES } from '../lib/firmwareData';
+import { supabaseService } from '../lib/supabaseService';
 
 interface Esp32FlashingConsoleProps {
   onChangeTab?: (tab: string) => void;
@@ -9,6 +10,9 @@ interface Esp32FlashingConsoleProps {
 export const Esp32FlashingConsole: React.FC<Esp32FlashingConsoleProps> = () => {
   const [activeFile, setActiveFile] = useState<string>('main.cpp');
   const [copiedFile, setCopiedFile] = useState<string | null>(null);
+  const [copiedClientId, setCopiedClientId] = useState(false);
+
+  const currentClientId = supabaseService.getCurrentClientId() || 'local_usr_default';
 
   const handleCopyCode = (code: string, fileName: string) => {
     navigator.clipboard.writeText(code);
@@ -26,6 +30,12 @@ export const Esp32FlashingConsole: React.FC<Esp32FlashingConsoleProps> = () => {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  };
+
+  const handleCopyClientId = () => {
+    navigator.clipboard.writeText(currentClientId);
+    setCopiedClientId(true);
+    setTimeout(() => setCopiedClientId(false), 2500);
   };
 
   return (
@@ -122,6 +132,44 @@ export const Esp32FlashingConsole: React.FC<Esp32FlashingConsoleProps> = () => {
           <pre className="p-4 overflow-x-auto text-xs font-mono text-cyan-300 bg-slate-950 leading-relaxed max-h-[500px] scrollbar-thin scrollbar-thumb-slate-800">
             <code>{FIRMWARE_FILES[activeFile]}</code>
           </pre>
+        </div>
+
+        {/* Client ID & Device Binding Instruction Card */}
+        <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-6 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-4 pb-4 border-b border-slate-800">
+            <div className="flex items-center space-x-3">
+              <div className="p-2.5 bg-emerald-950/80 border border-emerald-800/50 rounded-xl text-emerald-400">
+                <KeyRound className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">Ваш поточний Client ID (для прив'язки ESP32)</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Використовується для зв'язку контролера з вашим акаунтом у хмарі
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2 bg-slate-900 px-3 py-2 rounded-xl border border-slate-800 font-mono text-xs text-cyan-400">
+              <span className="select-all max-w-[220px] sm:max-w-xs truncate">{currentClientId}</span>
+              <button
+                onClick={handleCopyClientId}
+                className="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-sans text-xs font-bold transition-all cursor-pointer shrink-0"
+              >
+                {copiedClientId ? 'Скопійовано!' : 'Копіювати ID'}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed">
+            <h4 className="font-bold text-white flex items-center space-x-1.5">
+              <span>📌 Для чого потрібні Device ID та Client ID у прошивці:</span>
+            </h4>
+            <ul className="list-disc list-inside space-y-1.5 text-slate-300">
+              <li><strong className="text-white">Device ID</strong> (<code className="text-cyan-300 font-mono">deviceId</code> у <code className="text-cyan-300 font-mono">GLOBAL_STATE.h</code>): унікальне ім'я вашої плати (наприклад, <code className="text-cyan-300 font-mono">bms_001</code>), за яким плата розпізнається в парку пристроїв.</li>
+              <li><strong className="text-white">Client ID</strong> (<code className="text-cyan-300 font-mono">clientId</code>): ваш унікальний ідентифікатор користувача, скопійований вище. Вставте його у налаштуваннях хмари на ESP32 або в прошивку.</li>
+              <li><strong className="text-white">Прив'язка:</strong> Коли ESP32 надсилатиме телеметрію в хмару (Supabase), завдяки <code className="text-cyan-300 font-mono">client_id</code> дані будуть прив'язані виключно до вашого облікового запису і не потраплять до інших користувачів.</li>
+            </ul>
+          </div>
         </div>
 
         {/* Instructions */}

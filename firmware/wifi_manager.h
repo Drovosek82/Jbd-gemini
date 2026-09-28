@@ -121,30 +121,39 @@ inline void loadAppConfig() {
   preferences.begin("app-config", false);
   apiServer = preferences.getString("api_server", apiServer);
   deviceId = preferences.getString("device_id", deviceId);
+  clientId = preferences.getString("client_id", clientId);
   preferences.end();
   Serial.println("[WiFi] Завантажено налаштування API");
   Serial.printf("[WiFi] API Server: %s\n", apiServer.c_str());
   Serial.printf("[WiFi] Device ID: %s\n", deviceId.c_str());
+  Serial.printf("[WiFi] Client ID: %s\n", clientId.c_str());
 }
 
 // Save app configuration to preferences
-inline bool saveAppConfig(const String& server, const String& id) {
+inline bool saveAppConfig(const String& server, const String& id, const String& cId) {
   preferences.begin("app-config", false);
   bool success = preferences.putString("api_server", server);
   success &= preferences.putString("device_id", id);
+  success &= preferences.putString("client_id", cId);
   preferences.end();
 
   if (success) {
     apiServer = server;
     deviceId = id;
+    clientId = cId;
     Serial.println("[WiFi] Налаштування API збережено");
     Serial.printf("[WiFi] API Server: %s\n", apiServer.c_str());
     Serial.printf("[WiFi] Device ID: %s\n", deviceId.c_str());
+    Serial.printf("[WiFi] Client ID: %s\n", clientId.c_str());
     return true;
   } else {
     Serial.println("[WiFi] Помилка збереження налаштувань API");
     return false;
   }
+}
+
+inline bool saveAppConfig(const String& server, const String& id) {
+  return saveAppConfig(server, id, clientId);
 }
 
 // Reset WiFi configuration

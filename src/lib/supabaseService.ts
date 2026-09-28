@@ -148,6 +148,20 @@ class SupabaseService {
     }
   }
 
+  public getCurrentClientId(): string | null {
+    if (this.authUser?.id) {
+      return this.authUser.id;
+    }
+    try {
+      const savedAuth = localStorage.getItem('bms_supabase_auth_user');
+      if (savedAuth) {
+        const parsed = JSON.parse(savedAuth);
+        if (parsed?.id) return parsed.id;
+      }
+    } catch (e) {}
+    return null;
+  }
+
   private sanitizeUrl(rawUrl?: string): string | null {
     let url = (rawUrl || '').trim();
     if (!url) return null;
@@ -520,6 +534,23 @@ class SupabaseService {
     if (!this.config.enabled) return [];
     if (this.isFetching) return this.devicesList;
 
+    const clientId = this.getCurrentClientId();
+    if (!clientId) {
+      this.status = {
+        ...this.status,
+        status: 'success',
+        lastSyncTime: null,
+        lastError: 'Увійдіть, щоб бачити свої пристрої',
+        recordsCount: 0,
+        deviceCount: 0,
+      };
+      this.devicesList = [];
+      this.selectedDeviceRecord = null;
+      this.isFetching = false;
+      this.notify();
+      return [];
+    }
+
     if (!this.client) {
       this.initClient();
       if (!this.client) {
@@ -538,35 +569,30 @@ class SupabaseService {
     this.notify();
 
     try {
-      // Query recent 100 rows to group by device_name
+      // Query recent rows filtered by client_id
       let query = this.client
         .from(this.config.tableName || DEFAULT_TABLE_NAME)
         .select('*')
+        .eq('client_id', clientId)
         .order('created_at', { ascending: false })
         .limit(100);
 
       let data: any[] | null = null;
       let error: any = null;
 
-      if (this.authUser?.id) {
-        const filteredRes = await query.eq('client_id', this.authUser.id);
-        if (filteredRes.error && filteredRes.error.message?.includes('client_id')) {
-          // Fallback if client_id column does not exist yet in custom table
-          const fallbackRes = await this.client
-            .from(this.config.tableName || DEFAULT_TABLE_NAME)
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(100);
-          data = fallbackRes.data;
-          error = fallbackRes.error;
-        } else {
-          data = filteredRes.data;
-          error = filteredRes.error;
-        }
+      const filteredRes = await query;
+      if (filteredRes.error && filteredRes.error.message?.includes('client_id')) {
+        // Fallback if client_id column does not exist yet in custom table
+        const fallbackRes = await this.client
+          .from(this.config.tableName || DEFAULT_TABLE_NAME)
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(100);
+        data = fallbackRes.data;
+        error = fallbackRes.error;
       } else {
-        const res = await query;
-        data = res.data;
-        error = res.error;
+        data = filteredRes.data;
+        error = filteredRes.error;
       }
 
       if (error) {
@@ -594,7 +620,7 @@ class SupabaseService {
       const now = new Date().getTime();
 
       for (const row of data) {
-        const dName = row.device_name || row.device_id || 'JBD-BMS';
+        const dName = row.device_id || row.device_name || 'JBD-BMS';
         if (!devicesMap.has(dName) && devicesMap.size < 20) {
           const createdAtTime = new Date(row.created_at || Date.now()).getTime();
           // Online if updated within last 60 seconds

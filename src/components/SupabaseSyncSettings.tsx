@@ -698,8 +698,20 @@ export const SupabaseSyncSettings: React.FC<SupabaseSyncSettingsProps> = ({ onCh
                     ● Вхід виконано ({supabaseService.authUser.provider})
                   </span>
                 </div>
-                <div className={`font-mono text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  ID: {supabaseService.authUser.id.slice(0, 16)}... • {supabaseService.authUser.email}
+                <div className={`font-mono text-[11px] mt-1 space-y-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                  <div>Email: <span className="font-bold">{supabaseService.authUser.email}</span></div>
+                  <div className="flex items-center space-x-2 flex-wrap gap-1">
+                    <span>Client ID: <code className="bg-slate-800 text-cyan-400 px-1.5 py-0.5 rounded font-mono text-[10px] select-all">{supabaseService.authUser.id}</code></span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(supabaseService.authUser!.id);
+                        alert('Client ID скопійовано в буфер обміну!');
+                      }}
+                      className="px-2 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500 text-cyan-400 hover:text-white border border-cyan-500/35 text-[10px] font-semibold transition-all cursor-pointer"
+                    >
+                      Копіювати ID
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

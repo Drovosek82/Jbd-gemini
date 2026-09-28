@@ -195,6 +195,9 @@ inline void handleApiData() {
 
   StaticJsonDocument<4096> doc;
 
+  doc["device_id"] = deviceId;
+  doc["client_id"] = clientId;
+
   if (bmsDataMutex != nullptr && xSemaphoreTake(bmsDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
     doc["device_name"] = bmsConnected ? sanitizeJsonString(BMS_NAME) : "ESP32-BMS";
     doc["total_voltage"] = bmsData.totalVoltage;
@@ -465,6 +468,7 @@ inline void handleCloudSettings() {
   server.sendHeader("Access-Control-Allow-Origin", "*");
   StaticJsonDocument<256> doc;
   doc["device_id"] = deviceId;
+  doc["client_id"] = clientId;
   doc["enabled"] = false;
   doc["server"] = apiServer;
   String response;
@@ -472,18 +476,20 @@ inline void handleCloudSettings() {
   server.send(200, "application/json", response);
 }
 
-// ─── handleCloudSave — GET /cloud-save?device_id=...&enabled=...&server=...
+// ─── handleCloudSave — GET /cloud-save?device_id=...&client_id=...&enabled=...&server=...
 inline void handleCloudSave() {
   server.sendHeader("Access-Control-Allow-Origin", "*");
   String devId = server.arg("device_id");
+  String cId = server.arg("client_id");
   bool enabled = server.arg("enabled") == "true";
   String serverUrl = server.arg("server");
-  Serial.printf("[Web] GET /cloud-save device_id=%s enabled=%d server=%s\n", devId.c_str(), enabled ? 1 : 0, serverUrl.c_str());
+  Serial.printf("[Web] GET /cloud-save device_id=%s client_id=%s enabled=%d server=%s\n", devId.c_str(), cId.c_str(), enabled ? 1 : 0, serverUrl.c_str());
   deviceId = devId;
+  clientId = cId;
   if (serverUrl.length() > 0) {
     apiServer = serverUrl;
   }
-  saveAppConfig(apiServer, deviceId);
+  saveAppConfig(apiServer, deviceId, clientId);
   server.send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
