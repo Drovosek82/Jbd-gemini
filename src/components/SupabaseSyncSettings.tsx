@@ -232,6 +232,36 @@ export const SupabaseSyncSettings: React.FC<SupabaseSyncSettingsProps> = ({ onCh
         </div>
       </div>
 
+      {/* Super simple friendly guide */}
+      <div className={`p-4 rounded-2xl border text-xs sm:text-sm space-y-3 ${
+        isDark ? 'bg-gradient-to-r from-cyan-950/40 to-slate-900 border-cyan-800/40 text-cyan-100' : 'bg-gradient-to-r from-cyan-50 to-sky-50 border-cyan-200 text-cyan-950'
+      }`}>
+        <div className="flex items-center space-x-2 font-bold text-sm">
+          <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
+          <span>👶 Як це працює за 3 простих кроки (дуже легко!):</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+          <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-cyan-100 shadow-sm'}`}>
+            <div className="font-bold text-cyan-400 mb-1">1️⃣ Увійдіть в акаунт</div>
+            <p className="text-xs opacity-85 leading-relaxed">
+              Введіть свій Email і пароль (або створіть новий акаунт) у формі нижче. Це створить ваше особисте сховище.
+            </p>
+          </div>
+          <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-cyan-100 shadow-sm'}`}>
+            <div className="font-bold text-cyan-400 mb-1">2️⃣ Візьміть свій Client ID</div>
+            <p className="text-xs opacity-85 leading-relaxed">
+              Після входу у вас з'явиться ваш унікальний код (Client ID). Натисніть кнопку «Копіювати ID».
+            </p>
+          </div>
+          <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-cyan-100 shadow-sm'}`}>
+            <div className="font-bold text-cyan-400 mb-1">3️⃣ Підключіть ESP32</div>
+            <p className="text-xs opacity-85 leading-relaxed">
+              Вставте цей ID у налаштуваннях вашої плати ESP32 на вкладці «Хмара», і батарея почне передавати дані сюди!
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Demo DB Warning Banner */}
       {supabaseService.isUsingDefaultDb() && (
         <div className={`p-4 rounded-2xl border flex items-start space-x-3 ${
@@ -667,10 +697,10 @@ export const SupabaseSyncSettings: React.FC<SupabaseSyncSettingsProps> = ({ onCh
         <div className={`flex items-center justify-between border-b pb-3 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
           <div className={`font-bold text-xs flex items-center space-x-2 ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
             <ShieldCheck className="w-4 h-4 text-cyan-500" />
-            <span>Автоматичне Створення та Авторизація Акаунта Supabase</span>
+            <span>👤 Вхід в акаунт (Ваш профіль у хмарі)</span>
           </div>
           <span className="text-[10px] text-emerald-500 font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30 font-bold">
-            Supabase Auth Active
+            Авторизація активна
           </span>
         </div>
 
@@ -729,7 +759,7 @@ export const SupabaseSyncSettings: React.FC<SupabaseSyncSettingsProps> = ({ onCh
             <div className={`p-3 rounded-xl text-xs leading-relaxed border ${
               isDark ? 'bg-cyan-950/30 border-cyan-800/40 text-cyan-200' : 'bg-cyan-50 border-cyan-200 text-cyan-900'
             }`}>
-              💡 <strong>Унікальні акаунти користувачів:</strong> При реєстрації через форму нижче або авторизації через Google у вашій базі даних Supabase створюється ваш власний унікальний запис (User ID), який розділяє та надійно захищає ваші дані від інших користувачів.
+              💡 <strong>Як це працює:</strong> Введіть свій Email і пароль (або створіть акаунт), щоб ваші пристрої надійно зберігалися та були доступні тільки вам.
             </div>
 
             <div className={`flex rounded-xl p-1 border text-xs font-semibold ${
